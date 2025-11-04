@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .db import get_db, close_db
-from .routers import listings, auth, reviews, profiles, matching, favorites, reports, chat
+from .routers import listings, auth, reviews, profiles, matching, favorites, reports
 from .settings import settings
 
-app = FastAPI(title="Roommate Finder")
+app = FastAPI(title="Trọ hub")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,7 +26,6 @@ async def startup():
     await db.profiles.create_index([("user_id", 1)], unique=True)
     await db.profiles.create_index([("budget", 1)])
     await db.favorites.create_index([("user_id", 1), ("listing_id", 1)], unique=True)
-    await db.messages.create_index([("room_id", 1), ("ts", 1)])
     await db.reports.create_index([("listing_id", 1)])
 
 @app.on_event("shutdown")
@@ -40,7 +39,6 @@ app.include_router(profiles.router)
 app.include_router(matching.router)
 app.include_router(favorites.router)
 app.include_router(reports.router)
-app.include_router(chat.router)
 
 @app.get("/healthz")
 async def healthz():
