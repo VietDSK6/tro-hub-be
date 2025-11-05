@@ -27,7 +27,23 @@ async def list_favorites(db = Depends(get_db), x_user_id: Optional[str] = Header
     cur = db.favorites.find({"user_id": ObjectId(x_user_id)}).skip(skip).limit(min(limit,100)).sort([("_id",-1)])
     items = []
     async for f in cur:
-        f["_id"] = str(f["_id"]); f["user_id"] = str(f["user_id"]); f["listing_id"] = str(f["listing_id"])
+        f["_id"] = str(f["_id"]); 
+        f["user_id"] = str(f["user_id"]); 
+        listing_id_obj = f["listing_id"]
+        f["listing_id"] = str(listing_id_obj)
+        
+        listing = await db.listings.find_one({"_id": listing_id_obj})
+        if listing:
+            f["listing"] = {
+                "_id": str(listing["_id"]),
+                "title": listing.get("title", ""),
+                "desc": listing.get("desc", ""),
+                "price": listing.get("price", 0),
+                "location": listing.get("location")
+            }
+        else:
+            f["listing"] = None
+            
         items.append(f)
     total = await db.favorites.count_documents({"user_id": ObjectId(x_user_id)})
     return {"items": items, "page": page, "limit": min(limit,100), "total": total}
