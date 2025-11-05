@@ -10,7 +10,7 @@ router = APIRouter(prefix="/listings", tags=["listings"])
 @router.post("", status_code=201)
 async def create_listing(payload: ListingIn, db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
     if not x_user_id or not ObjectId.is_valid(x_user_id):
-        raise HTTPException(401, "Missing or invalid X-User-Id")
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     doc = payload.model_dump()
     doc["owner_id"] = ObjectId(x_user_id)
     res = await db.listings.insert_one(doc)
@@ -42,7 +42,7 @@ async def list_listings(
     if price_cond:
         filters["price"] = price_cond
     if lng is not None and lat is not None:
-        # meters
+        
         radius_m = float(radius_km or 5) * 1000.0
         filters["location"] = {
             "$near": {
@@ -53,20 +53,18 @@ async def list_listings(
 
     pag = build_pagination(page, limit)
     cursor = db.listings.find(filters).skip(pag["skip"]).limit(pag["limit"])
-    cursor = cursor.sort([("_id", -1)])  # newest first
+    cursor = cursor.sort([("_id", -1)])  
     items = []
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
         doc["owner_id"] = str(doc["owner_id"])
         items.append(doc)
-    # count_documents does not accept $near/$geoNear in the filter (MongoDB will error).
-    # If a geo $near filter was used, run an aggregation with $geoNear as the first stage
-    # and then $count. Otherwise fall back to count_documents.
+    
     if "location" in filters and isinstance(filters["location"], dict) and "$near" in filters["location"]:
         near = filters["location"]["$near"]
         geometry = near.get("$geometry")
         maxDistance = near.get("$maxDistance")
-        # other filters (exclude the location/$near part)
+        
         other_filters = {k: v for k, v in filters.items() if k != "location"}
         geo_near_stage: dict = {
             "$geoNear": {
@@ -90,10 +88,10 @@ async def list_listings(
 @router.get("/{listing_id}")
 async def get_listing(listing_id: str, db = Depends(get_db)):
     if not ObjectId.is_valid(listing_id):
-        raise HTTPException(400, "Invalid listing id")
+        raise HTTPException(400, "ID tin đăng không hợp lệ")
     doc = await db.listings.find_one({"_id": ObjectId(listing_id)})
     if not doc:
-        raise HTTPException(404, "Listing not found")
+        raise HTTPException(404, "Không tìm thấy tin đăng")
     doc["_id"] = str(doc["_id"])
     doc["owner_id"] = str(doc["owner_id"])
     return doc
@@ -101,16 +99,16 @@ async def get_listing(listing_id: str, db = Depends(get_db)):
 @router.patch("/{listing_id}")
 async def patch_listing(listing_id: str, payload: ListingPatch, db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
     if not ObjectId.is_valid(listing_id):
-        raise HTTPException(400, "Invalid listing id")
+        raise HTTPException(400, "ID tin đăng không hợp lệ")
     update = {"$set": {k: v for k, v in payload.model_dump(exclude_none=True).items()}}
     if not update["$set"]:
         return {"updated": False}
     if not x_user_id or not ObjectId.is_valid(x_user_id):
-        raise HTTPException(401, "Missing or invalid X-User-Id")
-    # owner-only update
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
+    
     res = await db.listings.update_one({"_id": ObjectId(listing_id), "owner_id": ObjectId(x_user_id)}, update)
     if res.matched_count == 0:
-        raise HTTPException(404, "Listing not found")
+        raise HTTPException(404, "Không tìm thấy tin đăng")
     doc = await db.listings.find_one({"_id": ObjectId(listing_id)})
     doc["_id"] = str(doc["_id"])
     doc["owner_id"] = str(doc["owner_id"])
@@ -119,8 +117,8 @@ async def patch_listing(listing_id: str, payload: ListingPatch, db = Depends(get
 @router.delete("/{listing_id}", status_code=204)
 async def delete_listing(listing_id: str, db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
     if not ObjectId.is_valid(listing_id):
-        raise HTTPException(400, "Invalid listing id")
+        raise HTTPException(400, "ID tin đăng không hợp lệ")
     if not x_user_id or not ObjectId.is_valid(x_user_id):
-        raise HTTPException(401, "Missing or invalid X-User-Id")
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     await db.listings.delete_one({"_id": ObjectId(listing_id), "owner_id": ObjectId(x_user_id)})
     return

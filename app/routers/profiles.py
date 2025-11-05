@@ -7,13 +7,13 @@ router = APIRouter(prefix="/profiles", tags=["profiles"])
 
 def _oid(x: str) -> ObjectId:
     if not ObjectId.is_valid(x):
-        raise HTTPException(400, "Invalid ObjectId")
+        raise HTTPException(400, "ObjectId không hợp lệ")
     return ObjectId(x)
 
 @router.get("/me")
 async def get_my_profile(db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
     if not x_user_id or not ObjectId.is_valid(x_user_id):
-        raise HTTPException(401, "Missing or invalid X-User-Id")
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     prof = await db.profiles.find_one({"user_id": ObjectId(x_user_id)})
     if not prof:
         return {"exists": False}
@@ -23,7 +23,7 @@ async def get_my_profile(db = Depends(get_db), x_user_id: Optional[str] = Header
 @router.put("/me")
 async def upsert_my_profile(payload: dict, db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
     if not x_user_id or not ObjectId.is_valid(x_user_id):
-        raise HTTPException(401, "Missing or invalid X-User-Id")
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     doc = {
         "user_id": ObjectId(x_user_id),
         "bio": payload.get("bio",""),
@@ -53,7 +53,6 @@ async def search_profiles(
     if min_budget is not None: price["$gte"] = float(min_budget)
     if max_budget is not None: price["$lte"] = float(max_budget)
     if price: filt["budget"] = price
-    # simple full-text like on bio if text index exists later
     if q: filt["bio"] = {"$regex": q, "$options": "i"}
     skip = max(0, (page-1)*min(limit,100))
     cur = db.profiles.find(filt).skip(skip).limit(min(limit,100)).sort([("_id",-1)])

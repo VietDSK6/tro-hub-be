@@ -11,7 +11,7 @@ def _oid_ok(x: str) -> bool:
 
 def _distance_km(a: list[float] | None, b: list[float] | None) -> float | None:
     if not a or not b: return None
-    # very rough haversine approximation using Euclidean on lat/lng degrees scaled
+    
     from math import radians, sin, cos, sqrt, atan2
     R = 6371.0
     lon1, lat1 = a
@@ -23,7 +23,7 @@ def _distance_km(a: list[float] | None, b: list[float] | None) -> float | None:
     return R * c
 
 def _habit_score(a: dict, b: dict) -> float:
-    # simple: +1 for each exact match on boolean/string fields normalized to [0,1]
+    
     if not a or not b: return 0.0
     keys = set(a.keys()) | set(b.keys())
     if not keys: return 0.0
@@ -41,9 +41,9 @@ async def match_roommates(
     x_user_id: Optional[str] = Header(None)
 ):
     if not x_user_id or not _oid_ok(x_user_id):
-        raise HTTPException(401, "Missing or invalid X-User-Id")
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     me = await db.profiles.find_one({"user_id": ObjectId(x_user_id)})
-    if not me: raise HTTPException(400, "You need to create your profile first")
+    if not me: raise HTTPException(400, "Bạn cần tạo hồ sơ của mình trước")
     me_loc = (me.get("location") or {}).get("coordinates")
     me_budget = float(me.get("budget") or 0)
     me_habits = me.get("habits") or {}
@@ -55,11 +55,11 @@ async def match_roommates(
         c_budget = float(c.get("budget") or 0)
         c_habits = c.get("habits") or {}
 
-        # compute components
-        habit = _habit_score(me_habits, c_habits)  # 0..1
-        budget = 1.0 - (abs(me_budget - c_budget) / max(me_budget, c_budget, 1.0))  # 0..1
+        
+        habit = _habit_score(me_habits, c_habits)  
+        budget = 1.0 - (abs(me_budget - c_budget) / max(me_budget, c_budget, 1.0))  
         dist_km = _distance_km(me_loc, c_loc)
-        distance = 1.0 if dist_km is None else max(0.0, 1.0 - (dist_km / 10.0))  # full score if missing; else taper by 10km
+        distance = 1.0 if dist_km is None else max(0.0, 1.0 - (dist_km / 10.0))  
         score = 0.5*habit + 0.3*budget + 0.2*distance
         c["_id"] = str(c["_id"]); c["user_id"] = str(c["user_id"])
         scored.append({"profile": c, "score": round(score, 3), "distance_km": None if dist_km is None else round(dist_km,2)})

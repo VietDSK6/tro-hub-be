@@ -12,11 +12,10 @@ async def create_review(
     x_user_id: Optional[str] = Header(None)
 ):
     if not x_user_id or not ObjectId.is_valid(x_user_id):
-        raise HTTPException(401, "Missing or invalid X-User-Id")
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     listing_id = payload.get("listing_id")
     if not listing_id or not ObjectId.is_valid(listing_id):
-        raise HTTPException(400, "Invalid listing_id")
-    # simple shape enforcement
+        raise HTTPException(400, "listing_id không hợp lệ")
     scores = payload.get("scores") or {}
     for k, v in list(scores.items()):
         try:
@@ -44,7 +43,7 @@ async def list_reviews(
     db = Depends(get_db)
 ):
     if not ObjectId.is_valid(listing_id):
-        raise HTTPException(400, "Invalid listing_id")
+        raise HTTPException(400, "listing_id không hợp lệ")
     skip = max(0, (page-1)*limit)
     cur = db.reviews.find({"listing_id": ObjectId(listing_id)}).skip(skip).limit(min(limit,100)).sort([("_id",-1)])
     items = []
@@ -59,7 +58,7 @@ async def list_reviews(
 @router.get("/summary", summary="Aggregate scores for a listing")
 async def reviews_summary(listing_id: str = Query(...), db = Depends(get_db)):
     if not ObjectId.is_valid(listing_id):
-        raise HTTPException(400, "Invalid listing_id")
+        raise HTTPException(400, "listing_id không hợp lệ")
     pipeline = [
         {"$match": {"listing_id": ObjectId(listing_id)}},
         {"$project": {"scores": {"$objectToArray": "$scores"}}},
@@ -69,6 +68,5 @@ async def reviews_summary(listing_id: str = Query(...), db = Depends(get_db)):
     ]
     metrics = [m async for m in db.reviews.aggregate(pipeline)]
     count = await db.reviews.count_documents({"listing_id": ObjectId(listing_id)})
-    # overall average across metrics (simple mean of metric avgs)
     overall = round(sum(m["avg"] for m in metrics)/len(metrics), 2) if metrics else None
     return {"listing_id": listing_id, "count": count, "metrics": metrics, "overall": overall}
