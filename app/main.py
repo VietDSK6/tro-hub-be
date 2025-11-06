@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .db import get_db, close_db
-from .routers import listings, auth, reviews, profiles, matching, favorites, reports
+from .routers import listings, auth, reviews, profiles, matching, favorites, reports, upload
 from .settings import settings
 
 app = FastAPI(title="Trọ hub")
@@ -38,6 +38,7 @@ app.include_router(profiles.router)
 app.include_router(matching.router)
 app.include_router(favorites.router)
 app.include_router(reports.router)
+app.include_router(upload.router)
 
 @app.get("/healthz")
 async def healthz():

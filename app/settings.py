@@ -8,9 +8,13 @@ class Settings(BaseSettings):
     app_port: int = Field(8000, alias="APP_PORT")
     app_workers: int = Field(1, alias="APP_WORKERS")
     cors_origins: str = Field(
-        default="http://localhost:8000,http://localhost:3000,http://localhost:5173",
+        default="http://localhost:3000,http://localhost:5173",
         alias="CORS_ORIGINS"
     )
+    
+    cloudinary_cloud_name: str = Field("", alias="CLOUDINARY_CLOUD_NAME")
+    cloudinary_api_key: str = Field("", alias="CLOUDINARY_API_KEY")
+    cloudinary_api_secret: str = Field("", alias="CLOUDINARY_API_SECRET")
 
     @field_validator("cors_origins", mode="after")
     @classmethod
