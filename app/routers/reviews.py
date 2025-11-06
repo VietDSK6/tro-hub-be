@@ -2,21 +2,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from typing import Optional, Any, List
 from bson import ObjectId
 from ..db import get_db
+from ..schemas import ReviewIn
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 @router.post("", status_code=201)
 async def create_review(
-    payload: dict,
+    payload: ReviewIn,
     db = Depends(get_db),
     x_user_id: Optional[str] = Header(None)
 ):
     if not x_user_id or not ObjectId.is_valid(x_user_id):
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
-    listing_id = payload.get("listing_id")
+    listing_id = payload.listing_id
     if not listing_id or not ObjectId.is_valid(listing_id):
         raise HTTPException(400, "listing_id không hợp lệ")
-    scores = payload.get("scores") or {}
+    scores = payload.scores or {}
     for k, v in list(scores.items()):
         try:
             scores[k] = float(v)
@@ -26,7 +27,7 @@ async def create_review(
         "listing_id": ObjectId(listing_id),
         "author_id": ObjectId(x_user_id),
         "scores": scores,
-        "content": payload.get("content",""),
+        "content": payload.content or "",
     }
     res = await db.reviews.insert_one(doc)
     saved = await db.reviews.find_one({"_id": res.inserted_id})

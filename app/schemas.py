@@ -83,3 +83,47 @@ class ReviewOut(BaseModel):
     scores: dict
     content: str
     created_at: Optional[str] = None
+
+class FavoriteIn(BaseModel):
+    listing_id: str = Field(..., description="ID of the listing to favorite")
+
+class FavoriteOut(BaseModel):
+    id: str = Field(alias="_id")
+    user_id: str
+    listing_id: str
+    listing: Optional[dict] = None
+
+# Report models
+class ReportIn(BaseModel):
+    listing_id: str = Field(..., description="ID of the listing being reported")
+    reason: str = Field(..., min_length=1, description="Reason for reporting")
+
+class ReportOut(BaseModel):
+    id: str = Field(alias="_id")
+    listing_id: str
+    reporter_id: str
+    reason: str
+    status: str = "OPEN"
+
+# Profile models
+class ProfileIn(BaseModel):
+    bio: str = ""
+    budget: float = 0
+    desiredAreas: List[str] = []
+    habits: dict = Field(default_factory=dict, description="e.g. {smoke: false, pet: true, cook: true, sleepTime: 'early'}")
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    constraints: dict = Field(default_factory=dict, description="Hard filters like genderWanted, ageRange")
+    location: Optional[Location] = None
+
+class ProfileOut(BaseModel):
+    id: str = Field(alias="_id")
+    user_id: str
+    bio: str = ""
+    budget: float = 0
+    desiredAreas: List[str] = []
+    habits: dict = {}
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    constraints: dict = {}
+    location: Optional[Location] = None

@@ -5,13 +5,12 @@ from .routers import listings, auth, reviews, profiles, matching, favorites, rep
 from .settings import settings
 
 app = FastAPI(title="Trọ hub")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"],  
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.on_event("startup")

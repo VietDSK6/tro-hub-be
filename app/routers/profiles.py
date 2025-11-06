@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from typing import Optional, Any, List
 from bson import ObjectId
 from ..db import get_db
+from ..schemas import ProfileIn
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -21,19 +22,19 @@ async def get_my_profile(db = Depends(get_db), x_user_id: Optional[str] = Header
     return prof
 
 @router.put("/me")
-async def upsert_my_profile(payload: dict, db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
+async def upsert_my_profile(payload: ProfileIn, db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
     if not x_user_id or not ObjectId.is_valid(x_user_id):
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     doc = {
         "user_id": ObjectId(x_user_id),
-        "bio": payload.get("bio",""),
-        "budget": float(payload.get("budget", 0)) if payload.get("budget") is not None else 0,
-        "desiredAreas": payload.get("desiredAreas", []),
-        "habits": payload.get("habits", {}),  # e.g., {"smoke": False, "pet": True, "cook": True, "sleepTime":"early"}
-        "gender": payload.get("gender"),
-        "age": payload.get("age"),
-        "constraints": payload.get("constraints", {}), # hard filters like genderWanted, ageRange, etc.
-        "location": payload.get("location"),  # optional {"type":"Point","coordinates":[lng,lat]}
+        "bio": payload.bio,
+        "budget": float(payload.budget) if payload.budget is not None else 0,
+        "desiredAreas": payload.desiredAreas,
+        "habits": payload.habits,
+        "gender": payload.gender,
+        "age": payload.age,
+        "constraints": payload.constraints,
+        "location": payload.location.model_dump() if payload.location else None,
     }
     await db.profiles.update_one({"user_id": ObjectId(x_user_id)}, {"$set": doc}, upsert=True)
     prof = await db.profiles.find_one({"user_id": ObjectId(x_user_id)})
