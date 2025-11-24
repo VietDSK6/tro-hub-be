@@ -30,16 +30,35 @@ class ListingIn(BaseModel):
     video: Optional[str] = None
     status: Literal["ACTIVE","HIDDEN","RENTED"] = "ACTIVE"
     location: Location
+    verification_status: Literal["PENDING", "VERIFIED", "REJECTED"] = "PENDING"
 
 class Listing(ListingIn):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     owner_id: PyObjectId
+    verified_by: Optional[PyObjectId] = None
+    verified_at: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True, json_encoders={ObjectId: str})
 
 class ListingOut(ListingIn):
     id: str = Field(alias="_id")
     owner_id: str
+    verified_by: Optional[str] = None
+    verified_at: Optional[str] = None
+
+class ListingPreviewOut(BaseModel):
+    """Lightweight listing DTO for previews in favorites, search results, etc."""
+    id: str = Field(alias="_id")
+    title: str
+    desc: str = ""
+    price: float = 0
+    area: float = 0
+    images: List[str] = []
+    location: Location
+    status: str = "ACTIVE"
+    owner_id: str
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 class ListingPatch(BaseModel):
     title: Optional[str] = None
@@ -52,16 +71,24 @@ class ListingPatch(BaseModel):
     video: Optional[str] = None
     status: Optional[Literal["ACTIVE","HIDDEN","RENTED"]] = None
     location: Optional[Location] = None
+    verification_status: Optional[Literal["PENDING", "VERIFIED", "REJECTED"]] = None
 
 class UserIn(BaseModel):
     email: str
     password: str
-    name: Optional[str] = ""
+    name: str
+    phone: str
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
 
 class User(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     email: str
-    name: Optional[str] = ""
+    name: str
+    phone: str
+    role: Literal["USER", "ADMIN"] = "USER"
     password_hash: str
 
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True, json_encoders={ObjectId: str})
@@ -69,7 +96,16 @@ class User(BaseModel):
 class UserOut(BaseModel):
     id: str = Field(alias="_id")
     email: str
-    name: Optional[str] = ""
+    name: str
+    phone: str
+    role: str = "USER"
+
+class UserPreviewOut(BaseModel):
+    """Lightweight user DTO for previews in reviews, listings, etc."""
+    id: str = Field(alias="_id")
+    name: str
+    email: str = ""
+    phone: str = ""
 
 class ReviewIn(BaseModel):
     listing_id: str
@@ -80,9 +116,12 @@ class ReviewOut(BaseModel):
     id: str = Field(alias="_id")
     listing_id: str
     author_id: str
+    author: Optional[UserPreviewOut] = None
     scores: dict
     content: str
     created_at: Optional[str] = None
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 class FavoriteIn(BaseModel):
     listing_id: str = Field(..., description="ID of the listing to favorite")
@@ -91,7 +130,9 @@ class FavoriteOut(BaseModel):
     id: str = Field(alias="_id")
     user_id: str
     listing_id: str
-    listing: Optional[dict] = None
+    listing: Optional[ListingPreviewOut] = None
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 # Report models
 class ReportIn(BaseModel):
@@ -104,9 +145,13 @@ class ReportOut(BaseModel):
     reporter_id: str
     reason: str
     status: str = "OPEN"
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 # Profile models
 class ProfileIn(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
     bio: str = ""
     budget: float = 0
     desiredAreas: List[str] = []
@@ -127,3 +172,22 @@ class ProfileOut(BaseModel):
     age: Optional[int] = None
     constraints: dict = {}
     location: Optional[Location] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    role: Optional[str] = None
+
+class ProfilePreviewOut(BaseModel):
+    """Lightweight profile DTO for matching results"""
+    id: str = Field(alias="_id")
+    user_id: str
+    bio: str = ""
+    budget: float = 0
+    desiredAreas: List[str] = []
+    habits: dict = {}
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    location: Optional[Location] = None
+    full_name: Optional[str] = None
+    
+    model_config = ConfigDict(populate_by_name=True)

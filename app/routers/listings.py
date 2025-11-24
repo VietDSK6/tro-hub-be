@@ -1,23 +1,43 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from typing import Any, List, Optional
 from bson import ObjectId
+from datetime import datetime
 from ..db import get_db
-from ..schemas import ListingIn, ListingPatch
+from ..schemas import ListingIn, ListingPatch, ListingOut, UserPreviewOut
 from ..utils.pagination import build_pagination
 
 router = APIRouter(prefix="/listings", tags=["listings"])
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=ListingOut)
 async def create_listing(payload: ListingIn, db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
+    """Create a new listing"""
     if not x_user_id or not ObjectId.is_valid(x_user_id):
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     doc = payload.model_dump()
     doc["owner_id"] = ObjectId(x_user_id)
+    doc["verification_status"] = "PENDING"
+    doc["verified_by"] = None
+    doc["verified_at"] = None
     res = await db.listings.insert_one(doc)
     saved = await db.listings.find_one({"_id": res.inserted_id})
-    saved["_id"] = str(saved["_id"])
-    saved["owner_id"] = str(saved["owner_id"])
-    return saved
+    
+    return ListingOut(
+        _id=str(saved["_id"]),
+        owner_id=str(saved["owner_id"]),
+        title=saved.get("title", ""),
+        desc=saved.get("desc", ""),
+        price=saved.get("price", 0),
+        area=saved.get("area", 0),
+        amenities=saved.get("amenities", []),
+        rules=saved.get("rules", {}),
+        images=saved.get("images", []),
+        video=saved.get("video"),
+        status=saved.get("status", "ACTIVE"),
+        location=saved.get("location"),
+        verification_status=saved.get("verification_status", "PENDING"),
+        verified_by=str(saved["verified_by"]) if saved.get("verified_by") else None,
+        verified_at=saved.get("verified_at")
+    )
 
 @router.get("", summary="Query listings with filters and geo search")
 async def list_listings(
@@ -30,8 +50,19 @@ async def list_listings(
     page: int = 1,
     limit: int = 20,
     db = Depends(get_db),
+    x_user_id: Optional[str] = Header(None),
 ):
     filters: dict[str, Any] = {"status": {"$ne": "HIDDEN"}}
+    
+    is_admin = False
+    if x_user_id and ObjectId.is_valid(x_user_id):
+        user = await db.users.find_one({"_id": ObjectId(x_user_id)})
+        if user and user.get("role") == "ADMIN":
+            is_admin = True
+    
+    if not is_admin:
+        filters["verification_status"] = "VERIFIED"
+    
     if q:
         filters["$text"] = {"$search": q}
     price_cond = {}
@@ -58,6 +89,8 @@ async def list_listings(
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
         doc["owner_id"] = str(doc["owner_id"])
+        if doc.get("verified_by"):
+            doc["verified_by"] = str(doc["verified_by"])
         items.append(doc)
     
     if "location" in filters and isinstance(filters["location"], dict) and "$near" in filters["location"]:
@@ -94,6 +127,18 @@ async def get_listing(listing_id: str, db = Depends(get_db)):
         raise HTTPException(404, "Không tìm thấy tin đăng")
     doc["_id"] = str(doc["_id"])
     doc["owner_id"] = str(doc["owner_id"])
+    if doc.get("verified_by"):
+        doc["verified_by"] = str(doc["verified_by"])
+    
+    owner = await db.users.find_one({"_id": ObjectId(doc["owner_id"])})
+    if owner:
+        doc["owner"] = {
+            "_id": str(owner["_id"]),
+            "name": owner.get("name", ""),
+            "phone": owner.get("phone", ""),
+            "email": owner.get("email", "")
+        }
+    
     return doc
 
 @router.patch("/{listing_id}")
@@ -112,6 +157,8 @@ async def patch_listing(listing_id: str, payload: ListingPatch, db = Depends(get
     doc = await db.listings.find_one({"_id": ObjectId(listing_id)})
     doc["_id"] = str(doc["_id"])
     doc["owner_id"] = str(doc["owner_id"])
+    if doc.get("verified_by"):
+        doc["verified_by"] = str(doc["verified_by"])
     return doc
 
 @router.delete("/{listing_id}", status_code=204)
@@ -122,3 +169,45 @@ async def delete_listing(listing_id: str, db = Depends(get_db), x_user_id: Optio
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     await db.listings.delete_one({"_id": ObjectId(listing_id), "owner_id": ObjectId(x_user_id)})
     return
+
+@router.post("/{listing_id}/verify", summary="Admin verify listing")
+async def verify_listing(
+    listing_id: str,
+    status: str = Query(..., description="VERIFIED or REJECTED"),
+    db = Depends(get_db),
+    x_user_id: Optional[str] = Header(None)
+):
+    if not x_user_id or not ObjectId.is_valid(x_user_id):
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
+    
+    admin = await db.users.find_one({"_id": ObjectId(x_user_id)})
+    if not admin or admin.get("role") != "ADMIN":
+        raise HTTPException(403, "Chỉ admin mới có quyền xác thực tin đăng")
+    
+    if not ObjectId.is_valid(listing_id):
+        raise HTTPException(400, "ID tin đăng không hợp lệ")
+    
+    if status not in ["VERIFIED", "REJECTED"]:
+        raise HTTPException(400, "Trạng thái phải là VERIFIED hoặc REJECTED")
+    
+    listing = await db.listings.find_one({"_id": ObjectId(listing_id)})
+    if not listing:
+        raise HTTPException(404, "Không tìm thấy tin đăng")
+    
+    update = {
+        "$set": {
+            "verification_status": status,
+            "verified_by": ObjectId(x_user_id),
+            "verified_at": datetime.utcnow().isoformat()
+        }
+    }
+    
+    await db.listings.update_one({"_id": ObjectId(listing_id)}, update)
+    
+    updated = await db.listings.find_one({"_id": ObjectId(listing_id)})
+    updated["_id"] = str(updated["_id"])
+    updated["owner_id"] = str(updated["owner_id"])
+    if updated.get("verified_by"):
+        updated["verified_by"] = str(updated["verified_by"])
+    
+    return updated

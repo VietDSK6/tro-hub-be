@@ -3,6 +3,7 @@ from typing import Any, List, Optional
 from math import sqrt
 from bson import ObjectId
 from ..db import get_db
+from ..schemas import ProfilePreviewOut
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
@@ -40,6 +41,7 @@ async def match_roommates(
     db = Depends(get_db),
     x_user_id: Optional[str] = Header(None)
 ):
+    """Match roommates based on budget, habits, and location"""
     if not x_user_id or not _oid_ok(x_user_id):
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     me = await db.profiles.find_one({"user_id": ObjectId(x_user_id)})
@@ -61,7 +63,28 @@ async def match_roommates(
         dist_km = _distance_km(me_loc, c_loc)
         distance = 1.0 if dist_km is None else max(0.0, 1.0 - (dist_km / 10.0))  
         score = 0.5*habit + 0.3*budget + 0.2*distance
-        c["_id"] = str(c["_id"]); c["user_id"] = str(c["user_id"])
-        scored.append({"profile": c, "score": round(score, 3), "distance_km": None if dist_km is None else round(dist_km,2)})
+        
+        # Fetch user info for full name
+        user = await db.users.find_one({"_id": c["user_id"]})
+        full_name = user.get("name", "") if user else ""
+        
+        profile_dto = ProfilePreviewOut(
+            _id=str(c["_id"]),
+            user_id=str(c["user_id"]),
+            bio=c.get("bio", ""),
+            budget=c.get("budget", 0),
+            desiredAreas=c.get("desiredAreas", []),
+            habits=c.get("habits", {}),
+            gender=c.get("gender"),
+            age=c.get("age"),
+            location=c.get("location"),
+            full_name=full_name
+        )
+        
+        scored.append({
+            "profile": profile_dto.model_dump(by_alias=True),
+            "score": round(score, 3),
+            "distance_km": None if dist_km is None else round(dist_km, 2)
+        })
     scored.sort(key=lambda x: x["score"], reverse=True)
     return {"items": scored[:max(1, min(top_k, 50))]}
