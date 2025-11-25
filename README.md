@@ -1,5 +1,42 @@
 # Roommate Backend (FastAPI + MongoDB)
 
+## Deploy to Railway.app (Free - Recommended)
+
+### Prerequisites
+1. Push code to GitHub repository
+2. Create free Railway account at https://railway.app
+
+### Deployment Steps
+1. **Go to Railway Dashboard**: https://railway.app/new
+2. **Deploy from GitHub repo**:
+   - Click "Deploy from GitHub repo"
+   - Select your `roommate-finder-be` repository
+   - Railway auto-detects Python and uses `nixpacks.toml` config
+
+3. **Add MongoDB Database**:
+   - In your project, click "+ New"
+   - Select "Database" → "Add MongoDB"
+   - Railway automatically creates `MONGO_URL` variable
+
+4. **Configure Environment Variables**:
+   - Go to your service → Variables tab
+   - Add these variables:
+     - `MONGODB_URI`: `${{MongoDB.MONGO_URL}}` (reference to MongoDB service)
+     - `MONGODB_DB`: `roommate`
+     - `CLOUDINARY_CLOUD_NAME`: Your Cloudinary cloud name
+     - `CLOUDINARY_API_KEY`: Your Cloudinary API key
+     - `CLOUDINARY_API_SECRET`: Your Cloudinary API secret
+     - `CORS_ORIGINS`: `https://yourapp.vercel.app,http://localhost:5173`
+
+5. **Generate Domain**:
+   - Go to Settings → Networking
+   - Click "Generate Domain"
+   - Your API will be live at: `https://your-app.up.railway.app`
+
+6. **Share URL with team**: Copy the generated domain for frontend integration
+
+**Free Tier**: $5 credit/month (~500 hours runtime), no sleep time, faster than Render!
+
 ## Quick start (Docker)
 ```bash
 cd roommate-backend
