@@ -23,17 +23,85 @@ def _distance_km(a: list[float] | None, b: list[float] | None) -> float | None:
     c = 2 * atan2(sqrt(aa), sqrt(1-aa))
     return R * c
 
-def _habit_score(a: dict, b: dict) -> float:
+@router.get("/rooms")
+async def match_rooms(
+    top_k: int = 10,
+    db = Depends(get_db),
+    x_user_id: Optional[str] = Header(None)
+):
+    """Match user profile with available room listings based on budget and location"""
+    if not x_user_id or not _oid_ok(x_user_id):
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     
-    if not a or not b: return 0.0
-    keys = set(a.keys()) | set(b.keys())
-    if not keys: return 0.0
-    m = 0; n = 0
-    for k in keys:
-        va = a.get(k); vb = b.get(k)
-        n += 1
-        m += 1 if (va == vb) else 0
-    return m / n
+    me = await db.profiles.find_one({"user_id": ObjectId(x_user_id)})
+    if not me: 
+        raise HTTPException(400, "Bạn cần tạo hồ sơ của mình trước")
+    
+    me_loc = (me.get("location") or {}).get("coordinates")
+    me_budget = float(me.get("budget") or 0)
+
+    # Only get verified and active listings
+    candidates = db.listings.find({
+        "verification_status": "VERIFIED",
+        "status": "ACTIVE"
+    }).limit(500)
+    
+    scored: list[dict[str,Any]] = []
+    async for listing in candidates:
+        listing_loc = (listing.get("location") or {}).get("coordinates")
+        listing_price = float(listing.get("price") or 0)
+
+        # Calculate scores
+        # Budget score: how close the price is to user's budget
+        if me_budget > 0 and listing_price > 0:
+            budget_diff = abs(me_budget - listing_price)
+            budget = max(0.0, 1.0 - (budget_diff / me_budget))
+        else:
+            budget = 0.5  # neutral if no budget set
+        
+        # Distance score
+        dist_km = _distance_km(me_loc, listing_loc)
+        if dist_km is None:
+            distance = 0.5  # neutral if no location
+        else:
+            # Within 5km is best, beyond 20km is worst
+            distance = max(0.0, 1.0 - (dist_km / 20.0))
+        
+        # Overall score: budget is most important, then distance
+        score = 0.7 * budget + 0.3 * distance
+        
+        # Only include listings with reasonable match
+        if score < 0.2:
+            continue
+        
+        # Fetch owner info
+        owner = await db.users.find_one({"_id": listing["owner_id"]})
+        owner_name = owner.get("name", "") if owner else ""
+        
+        listing_dto = {
+            "_id": str(listing["_id"]),
+            "title": listing.get("title", ""),
+            "desc": listing.get("desc", ""),
+            "price": listing.get("price", 0),
+            "area": listing.get("area", 0),
+            "amenities": listing.get("amenities", []),
+            "images": listing.get("images", []),
+            "location": listing.get("location"),
+            "owner_id": str(listing["owner_id"]),
+            "owner_name": owner_name,
+            "verification_status": listing.get("verification_status", "PENDING"),
+        }
+        
+        scored.append({
+            "listing": listing_dto,
+            "score": round(score, 3),
+            "distance_km": None if dist_km is None else round(dist_km, 2),
+            "price_match": round(budget, 3)
+        })
+    
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return {"items": scored[:max(1, min(top_k, 50))]}
+
 
 @router.get("/roommates")
 async def match_roommates(
@@ -41,50 +109,11 @@ async def match_roommates(
     db = Depends(get_db),
     x_user_id: Optional[str] = Header(None)
 ):
-    """Match roommates based on budget, habits, and location"""
+    """Match roommates based on budget, habits, and location (DEPRECATED - use /rooms instead)"""
     if not x_user_id or not _oid_ok(x_user_id):
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     me = await db.profiles.find_one({"user_id": ObjectId(x_user_id)})
     if not me: raise HTTPException(400, "Bạn cần tạo hồ sơ của mình trước")
-    me_loc = (me.get("location") or {}).get("coordinates")
-    me_budget = float(me.get("budget") or 0)
-    me_habits = me.get("habits") or {}
+    
+    return {"items": [], "message": "This endpoint is deprecated. Use /matching/rooms instead"}
 
-    candidates = db.profiles.find({"user_id": {"$ne": ObjectId(x_user_id)}}).limit(500)
-    scored: list[dict[str,Any]] = []
-    async for c in candidates:
-        c_loc = (c.get("location") or {}).get("coordinates")
-        c_budget = float(c.get("budget") or 0)
-        c_habits = c.get("habits") or {}
-
-        
-        habit = _habit_score(me_habits, c_habits)  
-        budget = 1.0 - (abs(me_budget - c_budget) / max(me_budget, c_budget, 1.0))  
-        dist_km = _distance_km(me_loc, c_loc)
-        distance = 1.0 if dist_km is None else max(0.0, 1.0 - (dist_km / 10.0))  
-        score = 0.5*habit + 0.3*budget + 0.2*distance
-        
-        # Fetch user info for full name
-        user = await db.users.find_one({"_id": c["user_id"]})
-        full_name = user.get("name", "") if user else ""
-        
-        profile_dto = ProfilePreviewOut(
-            _id=str(c["_id"]),
-            user_id=str(c["user_id"]),
-            bio=c.get("bio", ""),
-            budget=c.get("budget", 0),
-            desiredAreas=c.get("desiredAreas", []),
-            habits=c.get("habits", {}),
-            gender=c.get("gender"),
-            age=c.get("age"),
-            location=c.get("location"),
-            full_name=full_name
-        )
-        
-        scored.append({
-            "profile": profile_dto.model_dump(by_alias=True),
-            "score": round(score, 3),
-            "distance_km": None if dist_km is None else round(dist_km, 2)
-        })
-    scored.sort(key=lambda x: x["score"], reverse=True)
-    return {"items": scored[:max(1, min(top_k, 50))]}

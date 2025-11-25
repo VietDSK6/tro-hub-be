@@ -44,6 +44,13 @@ async def list_listings(
     q: Optional[str] = Query(None, description="keyword search on title/desc"),
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
+    min_area: Optional[float] = None,
+    max_area: Optional[float] = None,
+    amenities: Optional[str] = Query(None, description="comma-separated amenities"),
+    pet: Optional[bool] = Query(None, description="pet allowed"),
+    smoke: Optional[bool] = Query(None, description="smoking allowed"),
+    cook: Optional[bool] = Query(None, description="cooking allowed"),
+    visitor: Optional[bool] = Query(None, description="visitors allowed"),
     lng: Optional[float] = Query(None, description="longitude"),
     lat: Optional[float] = Query(None, description="latitude"),
     radius_km: Optional[float] = Query(5, description="search radius in KM"),
@@ -72,6 +79,28 @@ async def list_listings(
         price_cond["$lte"] = float(max_price)
     if price_cond:
         filters["price"] = price_cond
+    
+    area_cond = {}
+    if min_area is not None:
+        area_cond["$gte"] = float(min_area)
+    if max_area is not None:
+        area_cond["$lte"] = float(max_area)
+    if area_cond:
+        filters["area"] = area_cond
+    
+    if amenities:
+        amenities_list = [a.strip() for a in amenities.split(",") if a.strip()]
+        if amenities_list:
+            filters["amenities"] = {"$all": amenities_list}
+    
+    if pet is not None:
+        filters["rules.pet"] = pet
+    if smoke is not None:
+        filters["rules.smoke"] = smoke
+    if cook is not None:
+        filters["rules.cook"] = cook
+    if visitor is not None:
+        filters["rules.visitor"] = visitor
     if lng is not None and lat is not None:
         
         radius_m = float(radius_km or 5) * 1000.0
