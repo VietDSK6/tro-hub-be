@@ -3,7 +3,7 @@ from typing import Any, List, Optional
 from bson import ObjectId
 from datetime import datetime
 from ..db import get_db
-from ..schemas import ListingIn, ListingPatch, ListingOut, UserPreviewOut
+from ..schemas import ListingIn, ListingPatch, ListingOut
 from ..utils.pagination import build_pagination
 
 router = APIRouter(prefix="/listings", tags=["listings"])

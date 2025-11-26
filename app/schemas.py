@@ -100,28 +100,7 @@ class UserOut(BaseModel):
     phone: str
     role: str = "USER"
 
-class UserPreviewOut(BaseModel):
-    """Lightweight user DTO for previews in reviews, listings, etc."""
-    id: str = Field(alias="_id")
-    name: str
-    email: str = ""
-    phone: str = ""
-
-class ReviewIn(BaseModel):
-    listing_id: str
-    scores: dict = Field(default_factory=dict, description="e.g. {security, cleanliness, utilities, landlordAttitude} with 1-5")
-    content: str = ""
-
-class ReviewOut(BaseModel):
-    id: str = Field(alias="_id")
-    listing_id: str
-    author_id: str
-    author: Optional[UserPreviewOut] = None
-    scores: dict
-    content: str
-    created_at: Optional[str] = None
-    
-    model_config = ConfigDict(populate_by_name=True)
+# Review models removed
 
 class FavoriteIn(BaseModel):
     listing_id: str = Field(..., description="ID of the listing to favorite")
