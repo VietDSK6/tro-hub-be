@@ -40,6 +40,12 @@ async def match_rooms(
     me_loc = (me.get("location") or {}).get("coordinates")
     me_budget = float(me.get("budget") or 0)
 
+    # Validate profile completeness
+    if me_budget <= 0:
+        raise HTTPException(400, "Vui lòng cập nhật ngân sách trong hồ sơ để sử dụng tính năng gợi ý")
+    if not me_loc:
+        raise HTTPException(400, "Vui lòng cập nhật vị trí mong muốn trong hồ sơ để sử dụng tính năng gợi ý")
+
     # Only get verified and active listings
     candidates = db.listings.find({
         "verification_status": "VERIFIED",
@@ -53,16 +59,16 @@ async def match_rooms(
 
         # Calculate scores
         # Budget score: how close the price is to user's budget
-        if me_budget > 0 and listing_price > 0:
+        if listing_price > 0:
             budget_diff = abs(me_budget - listing_price)
             budget = max(0.0, 1.0 - (budget_diff / me_budget))
         else:
-            budget = 0.5  # neutral if no budget set
+            budget = 0.0
         
         # Distance score
         dist_km = _distance_km(me_loc, listing_loc)
         if dist_km is None:
-            distance = 0.5  # neutral if no location
+            distance = 0.0
         else:
             # Within 5km is best, beyond 20km is worst
             distance = max(0.0, 1.0 - (dist_km / 20.0))
