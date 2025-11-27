@@ -54,6 +54,7 @@ async def list_listings(
     lng: Optional[float] = Query(None, description="longitude"),
     lat: Optional[float] = Query(None, description="latitude"),
     radius_km: Optional[float] = Query(5, description="search radius in KM"),
+    exclude_own: Optional[bool] = Query(False, description="exclude current user's listings"),
     page: int = 1,
     limit: int = 20,
     db = Depends(get_db),
@@ -66,6 +67,9 @@ async def list_listings(
         user = await db.users.find_one({"_id": ObjectId(x_user_id)})
         if user and user.get("role") == "ADMIN":
             is_admin = True
+        
+        if exclude_own:
+            filters["owner_id"] = {"$ne": ObjectId(x_user_id)}
     
     if not is_admin:
         filters["verification_status"] = "VERIFIED"
