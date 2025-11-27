@@ -151,6 +151,32 @@ async def list_listings(
         total = await db.listings.count_documents(filters)
     return {"items": items, "page": pag["page"], "limit": pag["limit"], "total": total}
 
+@router.get("/my", summary="Get current user's listings")
+async def get_my_listings(
+    page: int = 1,
+    limit: int = 20,
+    db = Depends(get_db),
+    x_user_id: Optional[str] = Header(None)
+):
+    if not x_user_id or not ObjectId.is_valid(x_user_id):
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
+    
+    filters = {"owner_id": ObjectId(x_user_id)}
+    pag = build_pagination(page, limit)
+    
+    cursor = db.listings.find(filters).sort([("_id", -1)]).skip(pag["skip"]).limit(pag["limit"])
+    
+    items = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        doc["owner_id"] = str(doc["owner_id"])
+        if doc.get("verified_by"):
+            doc["verified_by"] = str(doc["verified_by"])
+        items.append(doc)
+    
+    total = await db.listings.count_documents(filters)
+    return {"items": items, "page": pag["page"], "limit": pag["limit"], "total": total}
+
 @router.get("/{listing_id}")
 async def get_listing(listing_id: str, db = Depends(get_db)):
     if not ObjectId.is_valid(listing_id):
