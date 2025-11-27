@@ -131,3 +131,51 @@ async def search_profiles(
         items.append(p)
     total = await db.profiles.count_documents(filt)
     return {"items": items, "page": page, "limit": min(limit,100), "total": total}
+
+@router.get("/{user_id}")
+async def get_profile_by_user_id(
+    user_id: str,
+    db = Depends(get_db),
+    x_user_id: Optional[str] = Header(None)
+):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(400, "User ID không hợp lệ")
+    
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(404, "Không tìm thấy người dùng")
+    
+    prof = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+    
+    is_own_profile = x_user_id and x_user_id == user_id
+    has_accepted_connection = False
+    
+    if x_user_id and ObjectId.is_valid(x_user_id) and not is_own_profile:
+        conn = await db.connections.find_one({
+            "$or": [
+                {"from_user_id": ObjectId(x_user_id), "to_user_id": ObjectId(user_id), "status": "ACCEPTED"},
+                {"from_user_id": ObjectId(user_id), "to_user_id": ObjectId(x_user_id), "status": "ACCEPTED"}
+            ]
+        })
+        has_accepted_connection = conn is not None
+    
+    result = {
+        "_id": str(user["_id"]),
+        "user_id": str(user["_id"]),
+        "full_name": user.get("name", ""),
+        "bio": prof.get("bio", "") if prof else "",
+        "budget": prof.get("budget", 0) if prof else 0,
+        "gender": prof.get("gender") if prof else None,
+        "age": prof.get("age") if prof else None,
+        "habits": prof.get("habits", {}) if prof else {},
+        "desiredAreas": prof.get("desiredAreas", []) if prof else [],
+        "location": prof.get("location") if prof else None,
+        "is_own_profile": is_own_profile,
+        "has_connection": has_accepted_connection
+    }
+    
+    if is_own_profile or has_accepted_connection:
+        result["email"] = user.get("email", "")
+        result["phone"] = user.get("phone", "")
+    
+    return result
