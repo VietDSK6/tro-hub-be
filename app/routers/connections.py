@@ -258,3 +258,62 @@ async def check_connection(
                 }
     
     return result
+
+@router.get("/listing/{listing_id}")
+async def get_connections_by_listing(
+    listing_id: str,
+    page: int = 1,
+    limit: int = 20,
+    db = Depends(get_db),
+    x_user_id: Optional[str] = Header(None)
+):
+    if not x_user_id or not _oid_ok(x_user_id):
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
+    if not _oid_ok(listing_id):
+        raise HTTPException(400, "ID tin đăng không hợp lệ")
+    
+    listing = await db.listings.find_one({"_id": ObjectId(listing_id)})
+    if not listing:
+        raise HTTPException(404, "Không tìm thấy tin đăng")
+    
+    if str(listing["owner_id"]) != x_user_id:
+        raise HTTPException(403, "Bạn không có quyền xem yêu cầu kết nối của tin đăng này")
+    
+    skip = (page - 1) * limit
+    cursor = db.connections.find({"listing_id": ObjectId(listing_id)}).sort("created_at", -1).skip(skip).limit(limit)
+    
+    items = []
+    async for doc in cursor:
+        from_user = await db.users.find_one({"_id": doc["from_user_id"]})
+        from_profile = await db.profiles.find_one({"user_id": doc["from_user_id"]})
+        
+        item = {
+            "_id": str(doc["_id"]),
+            "listing_id": str(doc["listing_id"]),
+            "from_user_id": str(doc["from_user_id"]),
+            "message": doc.get("message", ""),
+            "status": doc["status"],
+            "created_at": doc["created_at"].isoformat(),
+            "from_user": {
+                "name": from_user.get("name", "") if from_user else "",
+                "email": from_user.get("email", "") if from_user else "",
+                "phone": from_user.get("phone", "") if from_user else "",
+            } if from_user else None,
+            "from_profile": {
+                "full_name": from_profile.get("full_name", "") if from_profile else "",
+                "avatar": from_profile.get("avatar", "") if from_profile else "",
+                "budget": from_profile.get("budget", 0) if from_profile else 0,
+            } if from_profile else None
+        }
+        items.append(item)
+    
+    total = await db.connections.count_documents({"listing_id": ObjectId(listing_id)})
+    pending_count = await db.connections.count_documents({"listing_id": ObjectId(listing_id), "status": "PENDING"})
+    
+    return {
+        "items": items,
+        "total": total,
+        "pending_count": pending_count,
+        "page": page,
+        "limit": limit
+    }
