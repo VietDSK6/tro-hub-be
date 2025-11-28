@@ -9,8 +9,6 @@ from ..utils.pagination import build_pagination
 
 router = APIRouter(prefix="/listings", tags=["listings"])
 
-MAPBOX_TOKEN = "pk.eyJ1IjoidmlldGRzMjYwMSIsImEiOiJjbWk4eHVjNmswaHczMm1vcGwyZXo4dmJqIn0.FBHbH2CHHcuTja4_LK74Yw"
-
 def shorten_address(full_address: str) -> str:
     if not full_address:
         return ""
@@ -28,12 +26,18 @@ async def reverse_geocode(lng: float, lat: float) -> str:
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"https://api.mapbox.com/geocoding/v5/mapbox.places/{lng},{lat}.json",
-                params={"access_token": MAPBOX_TOKEN, "language": "vi"}
+                "https://nominatim.openstreetmap.org/reverse",
+                params={
+                    "format": "json",
+                    "lat": lat,
+                    "lon": lng,
+                    "accept-language": "vi"
+                },
+                headers={"User-Agent": "TroHub/1.0"}
             )
             data = resp.json()
-            if data.get("features"):
-                return shorten_address(data["features"][0]["place_name"])
+            if data.get("display_name"):
+                return shorten_address(data["display_name"])
     except:
         pass
     return f"{lat:.4f}, {lng:.4f}"
