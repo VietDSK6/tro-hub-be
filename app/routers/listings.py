@@ -2,15 +2,44 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from typing import Any, List, Optional
 from bson import ObjectId
 from datetime import datetime
+import httpx
 from ..db import get_db
 from ..schemas import ListingIn, ListingPatch, ListingOut
 from ..utils.pagination import build_pagination
 
 router = APIRouter(prefix="/listings", tags=["listings"])
 
+MAPBOX_TOKEN = "pk.eyJ1IjoidmlldGRzMjYwMSIsImEiOiJjbWk4eHVjNmswaHczMm1vcGwyZXo4dmJqIn0.FBHbH2CHHcuTja4_LK74Yw"
+
+def shorten_address(full_address: str) -> str:
+    if not full_address:
+        return ""
+    parts = full_address.split(", ")
+    if len(parts) <= 2:
+        return full_address
+    vietnam_keywords = ["Việt Nam", "Vietnam", "VN"]
+    filtered = [p for p in parts if not any(kw.lower() in p.lower() for kw in vietnam_keywords)]
+    relevant = [p for p in filtered if not p.strip().isdigit()]
+    if len(relevant) <= 2:
+        return ", ".join(relevant)
+    return ", ".join(relevant[-2:])
+
+async def reverse_geocode(lng: float, lat: float) -> str:
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://api.mapbox.com/geocoding/v5/mapbox.places/{lng},{lat}.json",
+                params={"access_token": MAPBOX_TOKEN, "language": "vi"}
+            )
+            data = resp.json()
+            if data.get("features"):
+                return shorten_address(data["features"][0]["place_name"])
+    except:
+        pass
+    return f"{lat:.4f}, {lng:.4f}"
+
 @router.post("", status_code=201, response_model=ListingOut)
 async def create_listing(payload: ListingIn, db = Depends(get_db), x_user_id: Optional[str] = Header(None)):
-    """Create a new listing"""
     if not x_user_id or not ObjectId.is_valid(x_user_id):
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
     user = await db.users.find_one({"_id": ObjectId(x_user_id)})
@@ -23,6 +52,11 @@ async def create_listing(payload: ListingIn, db = Depends(get_db), x_user_id: Op
     doc["verification_status"] = "PENDING"
     doc["verified_by"] = None
     doc["verified_at"] = None
+    
+    if not doc.get("address") and doc.get("location", {}).get("coordinates"):
+        coords = doc["location"]["coordinates"]
+        doc["address"] = await reverse_geocode(coords[0], coords[1])
+    
     res = await db.listings.insert_one(doc)
     saved = await db.listings.find_one({"_id": res.inserted_id})
     
@@ -39,6 +73,7 @@ async def create_listing(payload: ListingIn, db = Depends(get_db), x_user_id: Op
         video=saved.get("video"),
         status=saved.get("status", "ACTIVE"),
         location=saved.get("location"),
+        address=saved.get("address"),
         verification_status=saved.get("verification_status", "PENDING"),
         verified_by=str(saved["verified_by"]) if saved.get("verified_by") else None,
         verified_at=saved.get("verified_at")
@@ -275,3 +310,38 @@ async def verify_listing(
         updated["verified_by"] = str(updated["verified_by"])
     
     return updated
+
+@router.post("/migrate-addresses", summary="Backfill addresses for existing listings")
+async def migrate_addresses(
+    db = Depends(get_db),
+    x_user_id: Optional[str] = Header(None)
+):
+    if not x_user_id or not ObjectId.is_valid(x_user_id):
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
+    
+    admin = await db.users.find_one({"_id": ObjectId(x_user_id)})
+    if not admin or admin.get("role") != "ADMIN":
+        raise HTTPException(403, "Chỉ admin mới có quyền thực hiện migration")
+    
+    cursor = db.listings.find({"$or": [{"address": None}, {"address": {"$exists": False}}]})
+    updated_count = 0
+    errors = []
+    
+    async for listing in cursor:
+        try:
+            coords = listing.get("location", {}).get("coordinates", [])
+            if len(coords) == 2:
+                lng, lat = coords
+                address = await reverse_geocode(lng, lat)
+                await db.listings.update_one(
+                    {"_id": listing["_id"]},
+                    {"$set": {"address": address}}
+                )
+                updated_count += 1
+        except Exception as e:
+            errors.append({"id": str(listing["_id"]), "error": str(e)})
+    
+    return {
+        "updated": updated_count,
+        "errors": errors
+    }

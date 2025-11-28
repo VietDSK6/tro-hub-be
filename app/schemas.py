@@ -30,6 +30,7 @@ class ListingIn(BaseModel):
     video: Optional[str] = None
     status: Literal["ACTIVE","HIDDEN","RENTED"] = "ACTIVE"
     location: Location
+    address: Optional[str] = None
     verification_status: Literal["PENDING", "VERIFIED", "REJECTED"] = "PENDING"
 
 class Listing(ListingIn):
@@ -55,6 +56,7 @@ class ListingPreviewOut(BaseModel):
     area: float = 0
     images: List[str] = []
     location: Location
+    address: Optional[str] = None
     status: str = "ACTIVE"
     owner_id: str
     
@@ -71,6 +73,7 @@ class ListingPatch(BaseModel):
     video: Optional[str] = None
     status: Optional[Literal["ACTIVE","HIDDEN","RENTED"]] = None
     location: Optional[Location] = None
+    address: Optional[str] = None
     verification_status: Optional[Literal["PENDING", "VERIFIED", "REJECTED"]] = None
 
 class UserIn(BaseModel):
