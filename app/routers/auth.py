@@ -61,7 +61,8 @@ async def register(payload: UserIn, db = Depends(get_db)):
         email=email,
         name=payload.name.strip(),
         phone=payload.phone.strip(),
-        role="USER"
+        role="USER",
+        is_verified=False
     )
 
 
@@ -126,5 +127,6 @@ async def login(payload: LoginIn, db = Depends(get_db)):
         email=user["email"],
         name=user.get("name", ""),
         phone=user.get("phone", ""),
-        role=user.get("role", "USER")
+        role=user.get("role", "USER"),
+        is_verified=user.get("is_verified", False)
     )
