@@ -3,6 +3,8 @@ from typing import Optional
 from bson import ObjectId
 from datetime import datetime
 from ..db import get_db
+from ..utils.email import send_email
+from ..settings import settings
 
 router = APIRouter(prefix="/connections", tags=["connections"])
 
@@ -18,6 +20,12 @@ async def create_connection(
 ):
     if not x_user_id or not _oid_ok(x_user_id):
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
+    # require verified user
+    from_user = await db.users.find_one({"_id": ObjectId(x_user_id)})
+    if not from_user:
+        raise HTTPException(401, "Không tìm thấy người dùng")
+    if not from_user.get("is_verified"):
+        raise HTTPException(403, "Bạn cần xác thực email trước khi gửi yêu cầu kết nối")
     if not _oid_ok(listing_id):
         raise HTTPException(400, "ID tin đăng không hợp lệ")
     
@@ -65,6 +73,15 @@ async def create_connection(
         "created_at": datetime.utcnow()
     }
     await db.notifications.insert_one(notification)
+    # send optional email to owner
+    try:
+        owner_email = listing.get("email")
+        if owner_email:
+            subject = "Yêu cầu kết nối mới trên Trọ Hub"
+            body = f"{from_name} đã gửi yêu cầu kết nối về phòng '{listing.get('title','')}'.\n\nTin nhắn: {message}\n\nMở ứng dụng để xem chi tiết."
+            await send_email(owner_email, subject, body)
+    except Exception:
+        pass
     
     return {
         "_id": str(res.inserted_id),
@@ -218,6 +235,15 @@ async def update_connection_status(
             "created_at": datetime.utcnow()
         }
     await db.notifications.insert_one(notification)
+    # send email notification to requester
+    try:
+        from_user_doc = await db.users.find_one({"_id": conn["from_user_id"]})
+        if from_user_doc and from_user_doc.get("email"):
+            subj = "Yêu cầu kết nối đã được chấp nhận"
+            body = f"{to_name} đã chấp nhận yêu cầu kết nối của bạn về phòng '{listing_title}'.\n\nBạn có thể liên hệ: {to_user.get('phone','')}"
+            await send_email(from_user_doc.get("email"), subj, body)
+    except Exception:
+        pass
     
     return {"status": status, "message": "Đã cập nhật trạng thái"}
 

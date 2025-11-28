@@ -51,7 +51,8 @@ async def get_my_profile(db = Depends(get_db), x_user_id: Optional[str] = Header
         full_name=user.get("name", ""),
         email=user.get("email", ""),
         phone=user.get("phone", ""),
-        role=user.get("role", "USER")
+        role=user.get("role", "USER"),
+        is_verified=user.get("is_verified", False)
     )
 
 @router.put("/me", response_model=ProfileOut)
@@ -106,7 +107,8 @@ async def upsert_my_profile(payload: ProfileIn, db = Depends(get_db), x_user_id:
         full_name=user.get("name", ""),
         email=user.get("email", ""),
         phone=user.get("phone", ""),
-        role=user.get("role", "USER")
+        role=user.get("role", "USER"),
+        is_verified=user.get("is_verified", False)
     )
 
 @router.get("/search")

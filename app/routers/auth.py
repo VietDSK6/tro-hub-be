@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 import bcrypt
 import re
+import secrets
+from datetime import datetime
 from bson import ObjectId
 from ..db import get_db
 from ..schemas import UserIn, LoginIn, UserOut
+from ..utils.email import send_email
+from ..settings import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -59,6 +63,41 @@ async def register(payload: UserIn, db = Depends(get_db)):
         phone=payload.phone.strip(),
         role="USER"
     )
+
+
+@router.post("/send-verification")
+async def send_verification_email(db = Depends(get_db), x_user_id: str | None = Header(None)):
+    if not x_user_id or not ObjectId.is_valid(x_user_id):
+        raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
+
+    user = await db.users.find_one({"_id": ObjectId(x_user_id)})
+    if not user:
+        raise HTTPException(404, "Không tìm thấy người dùng")
+    if user.get("is_verified"):
+        return {"sent": False, "message": "Tài khoản đã được xác thực"}
+
+    token = secrets.token_urlsafe(32)
+    now_iso = datetime.utcnow().isoformat()
+    await db.users.update_one({"_id": ObjectId(x_user_id)}, {"$set": {"verification_token": token, "verification_sent_at": now_iso}})
+
+    verify_url = f"{settings.frontend_url.rstrip('/')}/auth/verify?token={token}"
+    subject = "Xác thực email - Trọ Hub"
+    body = f"Xin chào {user.get('name','')},\n\nVui lòng bấm vào liên kết sau để xác thực địa chỉ email của bạn:\n{verify_url}\n\nNếu bạn không yêu cầu xác thực, hãy bỏ qua email này."
+    await send_email(user.get("email"), subject, body)
+
+    return {"sent": True, "message": "Email xác thực đã được gửi"}
+
+
+@router.get("/verify")
+async def verify_token(token: str, db = Depends(get_db)):
+    if not token:
+        raise HTTPException(400, "Token không hợp lệ")
+    user = await db.users.find_one({"verification_token": token})
+    if not user:
+        raise HTTPException(404, "Token không hợp lệ hoặc đã hết hạn")
+
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"is_verified": True}, "$unset": {"verification_token": ""}})
+    return {"verified": True, "message": "Email đã được xác thực"}
 
 @router.post("/login", response_model=UserOut)
 async def login(payload: LoginIn, db = Depends(get_db)):

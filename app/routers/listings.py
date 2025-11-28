@@ -13,6 +13,11 @@ async def create_listing(payload: ListingIn, db = Depends(get_db), x_user_id: Op
     """Create a new listing"""
     if not x_user_id or not ObjectId.is_valid(x_user_id):
         raise HTTPException(401, "Thiếu hoặc không hợp lệ X-User-Id")
+    user = await db.users.find_one({"_id": ObjectId(x_user_id)})
+    if not user:
+        raise HTTPException(401, "Không tìm thấy người dùng")
+    if not user.get("is_verified"):
+        raise HTTPException(403, "Bạn cần xác thực email trước khi đăng tin")
     doc = payload.model_dump()
     doc["owner_id"] = ObjectId(x_user_id)
     doc["verification_status"] = "PENDING"

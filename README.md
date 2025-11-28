@@ -27,6 +27,12 @@
      - `CLOUDINARY_API_KEY`: Your Cloudinary API key
      - `CLOUDINARY_API_SECRET`: Your Cloudinary API secret
      - `CORS_ORIGINS`: `https://yourapp.vercel.app,http://localhost:5173`
+     - `SMTP_HOST`: SMTP server (e.g. smtp.gmail.com)
+     - `SMTP_PORT`: 587
+     - `SMTP_USER`: Your email address
+     - `SMTP_PASS`: App password / SMTP password
+     - `EMAIL_FROM`: Sender address shown in emails
+     - `FRONTEND_URL`: URL of frontend for verification links
 
 5. **Generate Domain**:
    - Go to Settings → Networking
@@ -88,6 +94,17 @@ curl -X POST http://localhost:8000/auth/login -H "Content-Type: application/json
   "password": "secret123"
 }'
 ```
+
+## Email Verification
+Gửi email xác thực (yêu cầu `X-User-Id`):
+```bash
+curl -X POST http://localhost:8000/auth/send-verification -H "X-User-Id: <USER_ID>"
+```
+Xác thực token (trả về từ liên kết email):
+```bash
+curl "http://localhost:8000/auth/verify?token=<TOKEN>"
+```
+Người dùng chưa xác thực email không thể đăng tin hoặc gửi yêu cầu kết nối.
 
 ## Listings (yêu cầu header `X-User-Id` cho create/patch/delete)
 ```bash

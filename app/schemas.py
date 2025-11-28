@@ -90,6 +90,9 @@ class User(BaseModel):
     phone: str
     role: Literal["USER", "ADMIN"] = "USER"
     password_hash: str
+    is_verified: bool = False
+    verification_token: Optional[str] = None
+    verification_sent_at: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True, json_encoders={ObjectId: str})
 
@@ -99,6 +102,7 @@ class UserOut(BaseModel):
     name: str
     phone: str
     role: str = "USER"
+    is_verified: bool = False
 
 # Review models removed
 
@@ -155,6 +159,7 @@ class ProfileOut(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     role: Optional[str] = None
+    is_verified: Optional[bool] = False
 
 class ProfilePreviewOut(BaseModel):
     """Lightweight profile DTO for matching results"""
