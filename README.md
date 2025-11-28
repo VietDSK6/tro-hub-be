@@ -27,11 +27,12 @@
      - `CLOUDINARY_API_KEY`: Your Cloudinary API key
      - `CLOUDINARY_API_SECRET`: Your Cloudinary API secret
      - `CORS_ORIGINS`: `https://yourapp.vercel.app,http://localhost:5173`
-     - `SMTP_HOST`: SMTP server (e.g. smtp.gmail.com)
-     - `SMTP_PORT`: 587
-     - `SMTP_USER`: Your email address
-     - `SMTP_PASS`: App password / SMTP password
-     - `EMAIL_FROM`: Sender address shown in emails
+     - `MAIL_SERVER`: SMTP server (e.g. smtp.gmail.com)
+     - `MAIL_PORT`: 587
+     - `MAIL_USERNAME`: Your email address
+     - `MAIL_PASSWORD`: App password
+     - `MAIL_FROM`: Sender email address
+     - `MAIL_FROM_NAME`: Sender name (e.g. "Trọ Hub")
      - `FRONTEND_URL`: URL of frontend for verification links
 
 5. **Generate Domain**:

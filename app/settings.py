@@ -15,11 +15,16 @@ class Settings(BaseSettings):
     cloudinary_cloud_name: str = Field("", alias="CLOUDINARY_CLOUD_NAME")
     cloudinary_api_key: str = Field("", alias="CLOUDINARY_API_KEY")
     cloudinary_api_secret: str = Field("", alias="CLOUDINARY_API_SECRET")
-    smtp_host: str = Field("", alias="SMTP_HOST")
-    smtp_port: int = Field(587, alias="SMTP_PORT")
-    smtp_user: str = Field("", alias="SMTP_USER")
-    smtp_pass: str = Field("", alias="SMTP_PASS")
-    email_from: str = Field("vietm1a4@gmail.com", alias="EMAIL_FROM")
+    
+    mail_username: str = Field("", alias="MAIL_USERNAME")
+    mail_password: str = Field("", alias="MAIL_PASSWORD")
+    mail_from: str = Field("noreply@example.com", alias="MAIL_FROM")
+    mail_port: int = Field(587, alias="MAIL_PORT")
+    mail_server: str = Field("", alias="MAIL_SERVER")
+    mail_from_name: str = Field("Trọ Hub", alias="MAIL_FROM_NAME")
+    mail_starttls: bool = Field(True, alias="MAIL_STARTTLS")
+    mail_ssl_tls: bool = Field(False, alias="MAIL_SSL_TLS")
+    
     frontend_url: str = Field("http://localhost:5173", alias="FRONTEND_URL")
 
     @field_validator("cors_origins", mode="after")
