@@ -18,7 +18,13 @@ async def startup():
     db = await get_db()
     
     await db.listings.create_index([("location", "2dsphere")])
+    
+    try:
+        await db.listings.drop_index("title_text_desc_text")
+    except Exception:
+        pass
     await db.listings.create_index([("title", "text"), ("desc", "text"), ("address", "text")])
+    
     await db.users.create_index("email", unique=True)
     await db.profiles.create_index([("user_id", 1)], unique=True)
     await db.profiles.create_index([("budget", 1)])
