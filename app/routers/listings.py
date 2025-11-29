@@ -86,6 +86,7 @@ async def create_listing(payload: ListingIn, db = Depends(get_db), x_user_id: Op
 @router.get("", summary="Query listings with filters and geo search")
 async def list_listings(
     q: Optional[str] = Query(None, description="keyword search on title/desc"),
+    province: Optional[str] = Query(None, description="filter by province/city name"),
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     min_area: Optional[float] = None,
@@ -120,6 +121,11 @@ async def list_listings(
     
     if q:
         filters["$text"] = {"$search": q}
+    
+    if province:
+        province_clean = province.replace("Thành phố ", "").replace("Tỉnh ", "").strip()
+        filters["address"] = {"$regex": province_clean, "$options": "i"}
+    
     price_cond = {}
     if min_price is not None:
         price_cond["$gte"] = float(min_price)
