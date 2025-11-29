@@ -101,7 +101,7 @@ async def get_overview_analytics(db = Depends(get_db)):
 @router.get("/by-location", summary="Get listings distribution by location/area")
 async def get_location_analytics(db = Depends(get_db)):
     """
-    Get analytics grouped by geographic areas using coordinate clustering
+    Get analytics grouped by address (district/ward level)
     Returns areas with most listings
     """
     
@@ -109,25 +109,36 @@ async def get_location_analytics(db = Depends(get_db)):
         {"$match": {
             "status": "ACTIVE", 
             "verification_status": "VERIFIED",
-            "location": {"$exists": True}
+            "address": {"$exists": True, "$ne": ""}
         }},
         {"$addFields": {
-            "lng_rounded": {"$round": [{"$arrayElemAt": ["$location.coordinates", 0]}, 2]},
-            "lat_rounded": {"$round": [{"$arrayElemAt": ["$location.coordinates", 1]}, 2]}
+            "address_parts": {"$split": ["$address", ", "]},
+        }},
+        {"$addFields": {
+            "district": {
+                "$cond": {
+                    "if": {"$gte": [{"$size": "$address_parts"}, 2]},
+                    "then": {
+                        "$arrayElemAt": [
+                            "$address_parts",
+                            {"$subtract": [{"$size": "$address_parts"}, 2]}
+                        ]
+                    },
+                    "else": {"$arrayElemAt": ["$address_parts", 0]}
+                }
+            }
         }},
         {"$group": {
-            "_id": {
-                "lng": "$lng_rounded",
-                "lat": "$lat_rounded"
-            },
+            "_id": "$district",
             "count": {"$sum": 1},
             "avg_price": {"$avg": "$price"},
             "min_price": {"$min": "$price"},
             "max_price": {"$max": "$price"},
             "avg_area": {"$avg": "$area"}
         }},
+        {"$match": {"_id": {"$ne": None}}},
         {"$sort": {"count": -1}},
-        {"$limit": 20}
+        {"$limit": 10}
     ]
     
     location_data = [doc async for doc in db.listings.aggregate(location_pipeline)]
@@ -135,7 +146,7 @@ async def get_location_analytics(db = Depends(get_db)):
     return {
         "top_locations": [
             {
-                "coordinates": [doc["_id"]["lng"], doc["_id"]["lat"]],
+                "address": doc["_id"],
                 "count": doc["count"],
                 "avg_price": round(doc["avg_price"], 0),
                 "min_price": doc["min_price"],
