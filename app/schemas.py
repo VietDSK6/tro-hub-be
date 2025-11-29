@@ -146,6 +146,7 @@ class ProfileIn(BaseModel):
     age: Optional[int] = None
     constraints: dict = Field(default_factory=dict, description="Hard filters like genderWanted, ageRange")
     location: Optional[Location] = None
+    avatar: Optional[str] = None
 
 class ProfileOut(BaseModel):
     id: str = Field(alias="_id")
@@ -158,6 +159,7 @@ class ProfileOut(BaseModel):
     age: Optional[int] = None
     constraints: dict = {}
     location: Optional[Location] = None
+    avatar: Optional[str] = None
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
@@ -175,6 +177,7 @@ class ProfilePreviewOut(BaseModel):
     gender: Optional[str] = None
     age: Optional[int] = None
     location: Optional[Location] = None
+    avatar: Optional[str] = None
     full_name: Optional[str] = None
     
     model_config = ConfigDict(populate_by_name=True)

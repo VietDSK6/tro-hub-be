@@ -48,6 +48,7 @@ async def get_my_profile(db = Depends(get_db), x_user_id: Optional[str] = Header
         age=prof.get("age"),
         constraints=prof.get("constraints", {}),
         location=prof.get("location"),
+        avatar=prof.get("avatar"),
         full_name=user.get("name", ""),
         email=user.get("email", ""),
         phone=user.get("phone", ""),
@@ -86,6 +87,7 @@ async def upsert_my_profile(payload: ProfileIn, db = Depends(get_db), x_user_id:
         "age": payload.age,
         "constraints": payload.constraints,
         "location": payload.location.model_dump() if payload.location else None,
+        "avatar": payload.avatar,
     }
     await db.profiles.update_one({"user_id": ObjectId(x_user_id)}, {"$set": doc}, upsert=True)
     
@@ -104,6 +106,7 @@ async def upsert_my_profile(payload: ProfileIn, db = Depends(get_db), x_user_id:
         age=prof.get("age"),
         constraints=prof.get("constraints", {}),
         location=prof.get("location"),
+        avatar=prof.get("avatar"),
         full_name=user.get("name", ""),
         email=user.get("email", ""),
         phone=user.get("phone", ""),
@@ -172,6 +175,7 @@ async def get_profile_by_user_id(
         "habits": prof.get("habits", {}) if prof else {},
         "desiredAreas": prof.get("desiredAreas", []) if prof else [],
         "location": prof.get("location") if prof else None,
+        "avatar": prof.get("avatar") if prof else None,
         "is_own_profile": is_own_profile,
         "has_connection": has_accepted_connection
     }
