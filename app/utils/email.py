@@ -10,6 +10,8 @@ def _send_email_sync(to: str, subject: str, body: str, html: Optional[str] = Non
         print(f"[email] SendGrid not configured. Would send to={to} subject={subject}\n{body}")
         return
 
+    print(f"[email] Sending email to={to}, from={settings.mail_from}, key_prefix={settings.sendgrid_api_key[:10]}...")
+
     message = Mail(
         from_email=Email(settings.mail_from, settings.mail_from_name),
         to_emails=To(to),
@@ -21,9 +23,12 @@ def _send_email_sync(to: str, subject: str, body: str, html: Optional[str] = Non
 
     try:
         sg = SendGridAPIClient(settings.sendgrid_api_key)
-        sg.send(message)
+        response = sg.send(message)
+        print(f"[email] Sent successfully. Status: {response.status_code}")
     except Exception as e:
         print(f"[email] Failed to send email to {to}: {e}")
+        if hasattr(e, 'body'):
+            print(f"[email] Error body: {e.body}")
 
 
 async def send_email(to: str, subject: str, body: str, html: Optional[str] = None) -> None:
